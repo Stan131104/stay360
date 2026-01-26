@@ -1,9 +1,10 @@
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/server'
 import { requireActiveTenant } from '@/lib/tenancy'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
-import { Building2, Users, BedDouble, Bath } from 'lucide-react'
+import { Building2 } from 'lucide-react'
+import { PropertyCard } from '@/components/properties/property-card'
 
 export default async function PropertiesPage() {
   const { tenant } = await requireActiveTenant()
@@ -18,6 +19,14 @@ export default async function PropertiesPage() {
     `)
     .eq('tenant_id', tenant.id)
     .order('name', { ascending: true })
+
+  const canManage = ['OWNER', 'MANAGER'].includes(tenant.role)
+
+  // Transform properties to handle array relation
+  const transformedProperties = properties?.map(property => ({
+    ...property,
+    integration: Array.isArray(property.integration) ? property.integration[0] || null : property.integration
+  }))
 
   return (
     <div className="space-y-6">
@@ -41,7 +50,7 @@ export default async function PropertiesPage() {
         </Card>
       )}
 
-      {!properties || properties.length === 0 ? (
+      {!transformedProperties || transformedProperties.length === 0 ? (
         <Card>
           <CardContent className="flex flex-col items-center justify-center py-12">
             <Building2 className="h-12 w-12 text-muted-foreground mb-4" />
@@ -56,49 +65,12 @@ export default async function PropertiesPage() {
         </Card>
       ) : (
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-          {properties.map((property: {
-            id: string
-            name: string
-            address: string | null
-            city: string | null
-            country: string | null
-            bedrooms: number | null
-            bathrooms: number | null
-            max_guests: number | null
-            source_provider: string | null
-            integration: { name: string; provider: string } | null
-          }) => (
-            <Card key={property.id}>
-              <CardHeader>
-                <CardTitle className="text-lg">{property.name}</CardTitle>
-                <CardDescription>
-                  {[property.city, property.country].filter(Boolean).join(', ') || 'No location set'}
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="grid grid-cols-3 gap-4 text-sm">
-                  <div className="flex items-center gap-2">
-                    <BedDouble className="h-4 w-4 text-muted-foreground" />
-                    <span>{property.bedrooms || '-'}</span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <Bath className="h-4 w-4 text-muted-foreground" />
-                    <span>{property.bathrooms || '-'}</span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <Users className="h-4 w-4 text-muted-foreground" />
-                    <span>{property.max_guests || '-'}</span>
-                  </div>
-                </div>
-                {property.integration && (
-                  <div className="mt-4 pt-4 border-t">
-                    <p className="text-xs text-muted-foreground">
-                      Source: {property.integration.name}
-                    </p>
-                  </div>
-                )}
-              </CardContent>
-            </Card>
+          {transformedProperties.map((property) => (
+            <PropertyCard
+              key={property.id}
+              property={property}
+              canDelete={canManage}
+            />
           ))}
         </div>
       )}

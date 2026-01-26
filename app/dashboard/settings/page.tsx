@@ -4,7 +4,8 @@ import { requireActiveTenant } from '@/lib/tenancy'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Settings, Users, Plug, RefreshCw, Plus } from 'lucide-react'
-import { SyncButton } from './sync-button'
+import { WorkspaceSettingsForm } from '@/components/settings/workspace-settings-form'
+import { IntegrationCard } from '@/components/settings/integration-card'
 
 function StatusBadge({ status }: { status: string }) {
   const colors: Record<string, string> = {
@@ -12,6 +13,9 @@ function StatusBadge({ status }: { status: string }) {
     pending: 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200',
     error: 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200',
     disabled: 'bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-200',
+    running: 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200',
+    completed: 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200',
+    failed: 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200',
   }
 
   return (
@@ -40,11 +44,18 @@ export default async function SettingsPage() {
   const { tenant } = await requireActiveTenant()
   const supabase = await createClient()
 
+  // Fetch full tenant data including currency
   const [
+    { data: tenantData },
     { data: integrations },
     { data: members },
     { data: syncRuns },
   ] = await Promise.all([
+    supabase
+      .from('tenants')
+      .select('id, name, slug, default_currency')
+      .eq('id', tenant.id)
+      .single(),
     supabase
       .from('integrations')
       .select('*')
@@ -68,6 +79,7 @@ export default async function SettingsPage() {
   ])
 
   const canManage = ['OWNER', 'MANAGER'].includes(tenant.role)
+  const isOwner = tenant.role === 'OWNER'
 
   return (
     <div className="space-y-6">
@@ -78,22 +90,28 @@ export default async function SettingsPage() {
         </p>
       </div>
 
-      {/* Workspace info */}
+      {/* Workspace settings */}
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <Settings className="h-5 w-5" />
             Workspace
           </CardTitle>
+          <CardDescription>
+            Manage your workspace name and default currency
+          </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
-          <div>
-            <label className="text-sm font-medium text-muted-foreground">Name</label>
-            <p className="text-lg">{tenant.name}</p>
-          </div>
-          <div>
+          <WorkspaceSettingsForm
+            tenant={{
+              name: tenantData?.name || tenant.name,
+              default_currency: tenantData?.default_currency,
+            }}
+            isOwner={isOwner}
+          />
+          <div className="pt-4 border-t">
             <label className="text-sm font-medium text-muted-foreground">Your Role</label>
-            <p><RoleBadge role={tenant.role} /></p>
+            <p className="mt-1"><RoleBadge role={tenant.role} /></p>
           </div>
         </CardContent>
       </Card>
@@ -135,33 +153,11 @@ export default async function SettingsPage() {
                 last_error: string | null
                 created_at: string
               }) => (
-                <div
+                <IntegrationCard
                   key={integration.id}
-                  className="flex items-center justify-between border-b pb-4 last:border-0 last:pb-0"
-                >
-                  <div className="space-y-1">
-                    <p className="font-medium">{integration.name}</p>
-                    <p className="text-xs text-muted-foreground">
-                      {integration.provider.replace(/_/g, ' ')}
-                    </p>
-                    {integration.last_sync_at && (
-                      <p className="text-xs text-muted-foreground">
-                        Last sync: {new Date(integration.last_sync_at).toLocaleString()}
-                      </p>
-                    )}
-                    {integration.last_error && (
-                      <p className="text-xs text-red-600 dark:text-red-400">
-                        Error: {integration.last_error}
-                      </p>
-                    )}
-                  </div>
-                  <div className="flex items-center gap-3">
-                    <StatusBadge status={integration.status} />
-                    {canManage && (
-                      <SyncButton integrationId={integration.id} />
-                    )}
-                  </div>
-                </div>
+                  integration={integration}
+                  canManage={canManage}
+                />
               ))}
             </div>
           )}

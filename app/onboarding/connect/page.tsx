@@ -7,30 +7,35 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card'
-import { Calendar, Plug, Plus, Trash2 } from 'lucide-react'
+import { Calendar, Plug, Plus, Trash2, Loader2 } from 'lucide-react'
 
 type IntegrationType = 'ical' | 'channel_manager'
+
+interface ICalProperty {
+  name: string
+  url: string
+}
 
 export default function ConnectPage() {
   const [integrationType, setIntegrationType] = useState<IntegrationType | null>(null)
   const [name, setName] = useState('')
-  const [icalUrls, setIcalUrls] = useState([''])
+  const [icalProperties, setIcalProperties] = useState<ICalProperty[]>([{ name: '', url: '' }])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const router = useRouter()
 
-  const addIcalUrl = () => {
-    setIcalUrls([...icalUrls, ''])
+  const addIcalProperty = () => {
+    setIcalProperties([...icalProperties, { name: '', url: '' }])
   }
 
-  const removeIcalUrl = (index: number) => {
-    setIcalUrls(icalUrls.filter((_, i) => i !== index))
+  const removeIcalProperty = (index: number) => {
+    setIcalProperties(icalProperties.filter((_, i) => i !== index))
   }
 
-  const updateIcalUrl = (index: number, value: string) => {
-    const newUrls = [...icalUrls]
-    newUrls[index] = value
-    setIcalUrls(newUrls)
+  const updateIcalProperty = (index: number, field: 'name' | 'url', value: string) => {
+    const newProperties = [...icalProperties]
+    newProperties[index][field] = value
+    setIcalProperties(newProperties)
   }
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -39,6 +44,13 @@ export default function ConnectPage() {
     setError(null)
 
     try {
+      // Filter out empty entries
+      const validProperties = icalProperties.filter(p => p.url.trim())
+
+      if (integrationType === 'ical' && validProperties.length === 0) {
+        throw new Error('Please add at least one iCal URL')
+      }
+
       const response = await fetch('/api/integrations', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -46,7 +58,10 @@ export default function ConnectPage() {
           name,
           provider: integrationType === 'ical' ? 'airbnb_ical' : 'channel_manager_mock',
           config: integrationType === 'ical'
-            ? { ical_urls: icalUrls.filter(url => url.trim()) }
+            ? {
+                ical_urls: validProperties.map(p => p.url),
+                property_names: validProperties.map(p => p.name || undefined),
+              }
             : {},
         }),
       })
@@ -58,11 +73,18 @@ export default function ConnectPage() {
       }
 
       // Trigger initial sync
-      await fetch('/api/sync/run', {
+      const syncResponse = await fetch('/api/sync/run', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ integrationId: data.id }),
       })
+
+      const syncData = await syncResponse.json()
+
+      if (!syncResponse.ok) {
+        // Integration created but sync failed - still redirect but with warning
+        console.warn('Sync failed:', syncData.error)
+      }
 
       router.push('/dashboard')
     } catch (err) {
@@ -143,7 +165,7 @@ export default function ConnectPage() {
   // iCal setup form
   if (integrationType === 'ical') {
     return (
-      <div className="flex min-h-screen items-center justify-center px-4">
+      <div className="flex min-h-screen items-center justify-center px-4 py-8">
         <Card className="w-full max-w-lg">
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
@@ -151,7 +173,8 @@ export default function ConnectPage() {
               iCal Import Setup
             </CardTitle>
             <CardDescription>
-              Enter your iCal URLs from Airbnb, VRBO, or other platforms
+              Enter your iCal URLs from Airbnb, VRBO, or other platforms.
+              Optionally name each property.
             </CardDescription>
           </CardHeader>
           <form onSubmit={handleSubmit}>
@@ -173,39 +196,50 @@ export default function ConnectPage() {
                 />
               </div>
 
-              <div className="space-y-2">
-                <Label>iCal URLs</Label>
+              <div className="space-y-3">
+                <Label>Properties</Label>
                 <p className="text-xs text-muted-foreground">
-                  Add one URL per property. Find these in your Airbnb calendar settings.
+                  Add one iCal URL per property. Find these in your Airbnb/VRBO calendar settings.
                 </p>
-                {icalUrls.map((url, index) => (
-                  <div key={index} className="flex gap-2">
+
+                {icalProperties.map((property, index) => (
+                  <div key={index} className="space-y-2 p-3 border rounded-lg">
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm font-medium">Property {index + 1}</span>
+                      {icalProperties.length > 1 && (
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8"
+                          onClick={() => removeIcalProperty(index)}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      )}
+                    </div>
+                    <Input
+                      placeholder="Property name (optional)"
+                      value={property.name}
+                      onChange={(e) => updateIcalProperty(index, 'name', e.target.value)}
+                    />
                     <Input
                       placeholder="https://www.airbnb.com/calendar/ical/..."
-                      value={url}
-                      onChange={(e) => updateIcalUrl(index, e.target.value)}
+                      value={property.url}
+                      onChange={(e) => updateIcalProperty(index, 'url', e.target.value)}
                       required={index === 0}
                     />
-                    {icalUrls.length > 1 && (
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="icon"
-                        onClick={() => removeIcalUrl(index)}
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
-                    )}
                   </div>
                 ))}
+
                 <Button
                   type="button"
                   variant="outline"
                   size="sm"
-                  onClick={addIcalUrl}
+                  onClick={addIcalProperty}
                 >
                   <Plus className="h-4 w-4 mr-2" />
-                  Add another URL
+                  Add another property
                 </Button>
               </div>
             </CardContent>
@@ -213,9 +247,16 @@ export default function ConnectPage() {
               <Button
                 type="submit"
                 className="w-full"
-                disabled={loading || !name.trim() || !icalUrls[0].trim()}
+                disabled={loading || !name.trim() || !icalProperties[0].url.trim()}
               >
-                {loading ? 'Connecting...' : 'Connect & Sync'}
+                {loading ? (
+                  <>
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    Connecting & Syncing...
+                  </>
+                ) : (
+                  'Connect & Sync'
+                )}
               </Button>
               <Button
                 type="button"
@@ -276,7 +317,14 @@ export default function ConnectPage() {
               className="w-full"
               disabled={loading || !name.trim()}
             >
-              {loading ? 'Connecting...' : 'Connect Demo Integration'}
+              {loading ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  Connecting...
+                </>
+              ) : (
+                'Connect Demo Integration'
+              )}
             </Button>
             <Button
               type="button"

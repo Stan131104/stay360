@@ -5,8 +5,8 @@ const footerLinks = {
   product: [
     { name: 'Features', href: '#features' },
     { name: 'Pricing', href: '#pricing' },
-    { name: 'Integrations', href: '#' },
-    { name: 'Changelog', href: '#' },
+    { name: 'Integrations', href: '/docs/integrations' },
+    { name: 'Changelog', href: '/changelog' },
   ],
   company: [
     { name: 'About', href: '#' },
@@ -15,10 +15,10 @@ const footerLinks = {
     { name: 'Contact', href: '#' },
   ],
   resources: [
-    { name: 'Documentation', href: '#' },
-    { name: 'Help Center', href: '#' },
-    { name: 'API Reference', href: '#' },
-    { name: 'Status', href: '#' },
+    { name: 'Documentation', href: '/docs' },
+    { name: 'Getting Started', href: '/docs/getting-started' },
+    { name: 'Calendar Guide', href: '/docs/calendar' },
+    { name: 'Sync Guide', href: '/docs/sync' },
   ],
   legal: [
     { name: 'Privacy', href: '#' },

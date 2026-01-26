@@ -53,6 +53,7 @@ export interface Integration {
 export interface IntegrationConfig {
   // iCal specific
   ical_urls?: string[]
+  property_names?: (string | undefined)[]
   // Channel manager specific
   api_endpoint?: string
   account_id?: string

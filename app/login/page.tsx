@@ -8,6 +8,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card'
+import { GoogleSignInButton } from '@/components/auth/google-sign-in-button'
 
 export default function LoginPage() {
   const [email, setEmail] = useState('')
@@ -76,6 +77,15 @@ export default function LoginPage() {
             <Button type="submit" className="w-full" disabled={loading}>
               {loading ? 'Signing in...' : 'Sign in'}
             </Button>
+            <div className="relative w-full">
+              <div className="absolute inset-0 flex items-center">
+                <span className="w-full border-t" />
+              </div>
+              <div className="relative flex justify-center text-xs uppercase">
+                <span className="bg-card px-2 text-muted-foreground">Or continue with</span>
+              </div>
+            </div>
+            <GoogleSignInButton mode="signin" />
             <div className="flex flex-col space-y-2 text-center text-sm">
               <Link href="/forgot-password" className="text-muted-foreground hover:text-primary">
                 Forgot your password?

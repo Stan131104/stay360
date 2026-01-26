@@ -118,6 +118,14 @@ function parseICal(icalContent: string): ICalEvent[] {
 }
 
 /**
+ * Extract calendar name from iCal content
+ */
+function extractCalendarName(icalContent: string): string | null {
+  const match = icalContent.match(/X-WR-CALNAME:([^\r\n]+)/)
+  return match ? match[1].trim() : null
+}
+
+/**
  * Determine if a booking is a block or confirmed reservation
  * Based on common Airbnb iCal patterns
  */
@@ -174,6 +182,7 @@ export class ICalProviderAdapter implements ProviderAdapter {
   readonly provider: IntegrationProvider
   private integration: Integration | null = null
   private icalUrls: string[] = []
+  private propertyNames: (string | undefined)[] = []
 
   constructor(provider: IntegrationProvider = 'airbnb_ical') {
     this.provider = provider
@@ -182,6 +191,7 @@ export class ICalProviderAdapter implements ProviderAdapter {
   async initialize(integration: Integration): Promise<void> {
     this.integration = integration
     this.icalUrls = integration.config.ical_urls || []
+    this.propertyNames = integration.config.property_names || []
 
     if (this.icalUrls.length === 0) {
       throw new Error('No iCal URLs configured')
@@ -220,21 +230,50 @@ export class ICalProviderAdapter implements ProviderAdapter {
 
   /**
    * For iCal, we create a virtual listing per URL
-   * In practice, users should configure one URL per property
+   * The property name can come from:
+   * 1. User-provided name in config
+   * 2. Calendar name from iCal (X-WR-CALNAME)
+   * 3. Fallback to URL-based name
    */
   async listListings(): Promise<ProviderListing[]> {
     const listings: ProviderListing[] = []
 
     for (let i = 0; i < this.icalUrls.length; i++) {
       const url = this.icalUrls[i]
-      // Extract a name from URL or use index
-      const urlObj = new URL(url)
-      const name = urlObj.pathname.split('/').pop() || `Property ${i + 1}`
+      let name = this.propertyNames[i]
+
+      // If no user-provided name, try to fetch from iCal
+      if (!name) {
+        try {
+          const response = await fetch(url, {
+            headers: { 'Accept': 'text/calendar' },
+            cache: 'no-store',
+          })
+
+          if (response.ok) {
+            const content = await response.text()
+            name = extractCalendarName(content) || undefined
+          }
+        } catch {
+          // Ignore fetch errors for name extraction
+        }
+      }
+
+      // Fallback name
+      if (!name) {
+        try {
+          const urlObj = new URL(url)
+          const pathPart = urlObj.pathname.split('/').pop()
+          name = pathPart ? `Property ${pathPart.slice(0, 8)}` : `Property ${i + 1}`
+        } catch {
+          name = `Property ${i + 1}`
+        }
+      }
 
       listings.push({
         provider_id: `ical_${i}`,
-        name: `Property from iCal (${name})`,
-        metadata: { ical_url: url },
+        name,
+        metadata: { ical_url: url, url_index: i },
       })
     }
 
@@ -269,12 +308,24 @@ export class ICalProviderAdapter implements ProviderAdapter {
             continue
           }
 
+          let checkIn = event.dtstart
+          let checkOut = event.dtend
+
+          // Handle single-day events or invalid dates where check_out <= check_in
+          // In iCal, a single day block often has DTSTART=DTEND
+          // We need check_out > check_in for the database constraint
+          if (checkOut <= checkIn) {
+            // Make it a 1-day booking by adding 1 day to check_out
+            checkOut = new Date(checkIn)
+            checkOut.setDate(checkOut.getDate() + 1)
+          }
+
           bookings.push({
             provider_id: event.uid,
             listing_provider_id: listingId,
             status: determineBookingStatus(event),
-            check_in: event.dtstart,
-            check_out: event.dtend,
+            check_in: checkIn,
+            check_out: checkOut,
             guest_name: extractGuestName(event),
             notes: event.description,
             metadata: {
@@ -294,7 +345,7 @@ export class ICalProviderAdapter implements ProviderAdapter {
   /**
    * iCal does not provide pricing information
    */
-  async listRates(): Promise<ProviderRate[]> {
+  async listRates(_range: DateRange): Promise<ProviderRate[]> {
     return []
   }
 

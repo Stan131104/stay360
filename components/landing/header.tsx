@@ -14,52 +14,68 @@ export async function Header() {
   const { data: { user } } = await supabase.auth.getUser()
 
   return (
-    <header className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+    <header className="sticky top-0 z-50 w-full bg-[#003049] text-[#fdf0d5]">
       <div className="container mx-auto flex h-16 items-center justify-between px-4">
         <Link href="/" className="flex items-center space-x-2">
-          <span className="text-xl font-bold">Stay360</span>
+          <span className="text-2xl font-bold">Stay<span className="text-[#c1121f]">360</span></span>
         </Link>
 
         <nav className="hidden md:flex items-center space-x-6">
-          <Link href="#features" className="text-sm font-medium text-muted-foreground hover:text-foreground">
+          <Link href="#features" className="text-sm font-medium text-[#fdf0d5]/80 hover:text-[#fdf0d5]">
             Features
           </Link>
-          <Link href="#pricing" className="text-sm font-medium text-muted-foreground hover:text-foreground">
+          <Link href="#pricing" className="text-sm font-medium text-[#fdf0d5]/80 hover:text-[#fdf0d5]">
             Pricing
           </Link>
-          <Link href="#" className="text-sm font-medium text-muted-foreground hover:text-foreground">
-            About
+          <Link href="/docs" className="text-sm font-medium text-[#fdf0d5]/80 hover:text-[#fdf0d5]">
+            Docs
           </Link>
-          <Link href="#" className="text-sm font-medium text-muted-foreground hover:text-foreground">
-            Contact
+          <Link href="/changelog" className="text-sm font-medium text-[#fdf0d5]/80 hover:text-[#fdf0d5]">
+            Changelog
           </Link>
         </nav>
 
         <div className="flex items-center space-x-4">
           {user ? (
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button variant="ghost" className="relative h-9 w-9 rounded-full">
-                  <Avatar className="h-9 w-9">
-                    <AvatarFallback>
-                      {user.email?.charAt(0).toUpperCase() ?? 'U'}
-                    </AvatarFallback>
-                  </Avatar>
+            <>
+              <Link href="/dashboard">
+                <Button variant="outline" size="sm" className="border-[#669bbc] text-[#fdf0d5] hover:bg-[#669bbc]/20">
+                  Dashboard
                 </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end">
-                <DropdownMenuItem className="text-sm text-muted-foreground">
-                  {user.email}
-                </DropdownMenuItem>
-                <DropdownMenuItem asChild>
-                  <Link href="/logout">Logout</Link>
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
+              </Link>
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="ghost" className="relative h-9 w-9 rounded-full hover:bg-[#fdf0d5]/10">
+                    <Avatar className="h-9 w-9 border border-[#669bbc]">
+                      <AvatarFallback className="bg-[#c1121f] text-white">
+                        {user.email?.charAt(0).toUpperCase() ?? 'U'}
+                      </AvatarFallback>
+                    </Avatar>
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  <DropdownMenuItem className="text-sm text-muted-foreground">
+                    {user.email}
+                  </DropdownMenuItem>
+                  <DropdownMenuItem asChild>
+                    <Link href="/logout">Logout</Link>
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            </>
           ) : (
-            <Link href="/login">
-              <Button>Login</Button>
-            </Link>
+            <>
+              <Link href="/login">
+                <Button variant="ghost" size="sm" className="text-[#fdf0d5] hover:bg-[#fdf0d5]/10">
+                  Sign in
+                </Button>
+              </Link>
+              <Link href="/signup">
+                <Button size="sm" className="bg-[#c1121f] text-white hover:bg-[#a10f1a] font-semibold">
+                  Register
+                </Button>
+              </Link>
+            </>
           )}
         </div>
       </div>
