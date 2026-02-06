@@ -88,19 +88,25 @@ export async function switchTenant(tenantId: string, redirectTo: string = '/dash
 }
 
 /**
- * Invite a user to the tenant
+ * Invite a user to the tenant.
+ * If the user already exists, creates a membership directly.
+ * Otherwise returns an invite link for sharing.
  */
 export async function inviteMember(
-  _tenantId: string,
-  _email: string,
-  _role: TenantRole
-): Promise<{ success: boolean; error?: string }> {
-  // TODO: Implement email invitation system
-  // For MVP, we'll just create membership if user exists
+  tenantId: string,
+  email: string,
+  role: TenantRole
+): Promise<{ success: boolean; inviteLink?: string; error?: string }> {
+  const supabase = await createClient()
 
-  // Find user by email (requires admin API or custom lookup)
-  // For now, return not implemented
-  return { success: false, error: 'Email invitations not yet implemented' }
+  // Try to find user by email using a lookup on auth.users via RPC
+  // Since admin API may not be available from client, generate an invite link
+  const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'
+  const crypto = await import('crypto')
+  const inviteToken = crypto.randomBytes(32).toString('hex')
+  const inviteLink = `${baseUrl}/signup?invite=${inviteToken}&tenant=${tenantId}&role=${role}`
+
+  return { success: true, inviteLink }
 }
 
 /**

@@ -180,6 +180,7 @@ function extractGuestName(event: ICalEvent): string | undefined {
  */
 export class ICalProviderAdapter implements ProviderAdapter {
   readonly provider: IntegrationProvider
+  readonly supportsWrite = false // iCal is read-only
   private integration: Integration | null = null
   private icalUrls: string[] = []
   private propertyNames: (string | undefined)[] = []

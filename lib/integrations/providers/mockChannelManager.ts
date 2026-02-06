@@ -16,6 +16,7 @@ import { registerProvider } from './types'
  */
 export class MockChannelManagerAdapter implements ProviderAdapter {
   readonly provider = 'channel_manager_mock' as const
+  readonly supportsWrite = true // Channel managers support write operations
   private integration: Integration | null = null
 
   // Sample listings

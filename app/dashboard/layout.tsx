@@ -16,6 +16,7 @@ import {
   Building2,
   Calendar,
   CalendarDays,
+  MessageSquare,
   DollarSign,
   Settings,
   ChevronDown,
@@ -25,6 +26,7 @@ const navigation = [
   { name: 'Overview', href: '/dashboard', icon: LayoutDashboard },
   { name: 'Properties', href: '/dashboard/properties', icon: Building2 },
   { name: 'Bookings', href: '/dashboard/bookings', icon: CalendarDays },
+  { name: 'Messages', href: '/dashboard/messages', icon: MessageSquare },
   { name: 'Calendar', href: '/dashboard/calendar', icon: Calendar },
   { name: 'Pricing', href: '/dashboard/pricing', icon: DollarSign },
   { name: 'Settings', href: '/dashboard/settings', icon: Settings },
@@ -48,6 +50,15 @@ export default async function DashboardLayout({
   if (!tenant) {
     redirect('/onboarding/workspace')
   }
+
+  // Fetch unread message count
+  const { data: unreadData } = await supabase
+    .from('conversations')
+    .select('unread_count')
+    .eq('tenant_id', tenant.id)
+    .eq('status', 'active')
+
+  const unreadCount = unreadData?.reduce((sum, conv) => sum + (conv.unread_count || 0), 0) || 0
 
   return (
     <div className="flex min-h-screen">
@@ -94,7 +105,12 @@ export default async function DashboardLayout({
               className="flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium text-muted-foreground hover:bg-muted hover:text-foreground"
             >
               <item.icon className="h-4 w-4" />
-              {item.name}
+              <span className="flex-1">{item.name}</span>
+              {item.name === 'Messages' && unreadCount > 0 && (
+                <span className="flex h-5 min-w-5 items-center justify-center rounded-full bg-destructive px-1.5 text-xs font-medium text-destructive-foreground">
+                  {unreadCount > 99 ? '99+' : unreadCount}
+                </span>
+              )}
             </Link>
           ))}
         </nav>

@@ -2,6 +2,57 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { requireActiveTenant } from '@/lib/tenancy'
 
+// Update integration config
+export async function PATCH(
+  request: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  try {
+    const { tenant } = await requireActiveTenant()
+    const { id } = await params
+
+    if (!['OWNER', 'MANAGER'].includes(tenant.role)) {
+      return NextResponse.json(
+        { error: 'Insufficient permissions' },
+        { status: 403 }
+      )
+    }
+
+    const supabase = await createClient()
+    const body = await request.json()
+    const { config } = body
+
+    if (!config) {
+      return NextResponse.json(
+        { error: 'Config is required' },
+        { status: 400 }
+      )
+    }
+
+    const { error } = await supabase
+      .from('integrations')
+      .update({ config })
+      .eq('id', id)
+      .eq('tenant_id', tenant.id)
+
+    if (error) {
+      console.error('Error updating integration config:', error)
+      return NextResponse.json(
+        { error: 'Failed to update config' },
+        { status: 500 }
+      )
+    }
+
+    return NextResponse.json({ success: true })
+  } catch (error) {
+    console.error('Patch integration error:', error)
+    return NextResponse.json(
+      { error: 'Internal server error' },
+      { status: 500 }
+    )
+  }
+}
+
 export async function DELETE(
   _request: NextRequest,
   { params }: { params: Promise<{ id: string }> }

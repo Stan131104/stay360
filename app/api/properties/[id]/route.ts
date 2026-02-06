@@ -121,3 +121,133 @@ export async function GET(
     )
   }
 }
+
+export async function PUT(
+  request: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  try {
+    const { tenant } = await requireActiveTenant()
+    const { id } = await params
+
+    // Verify permission
+    if (!['OWNER', 'MANAGER'].includes(tenant.role)) {
+      return NextResponse.json(
+        { error: 'Insufficient permissions' },
+        { status: 403 }
+      )
+    }
+
+    const supabase = await createClient()
+    const body = await request.json()
+
+    // First verify the property belongs to this tenant
+    const { data: existingProperty, error: fetchError } = await supabase
+      .from('properties')
+      .select('id')
+      .eq('id', id)
+      .eq('tenant_id', tenant.id)
+      .single()
+
+    if (fetchError || !existingProperty) {
+      return NextResponse.json(
+        { error: 'Property not found' },
+        { status: 404 }
+      )
+    }
+
+    // Extract property fields vs details fields
+    const {
+      details,
+      ...propertyFields
+    } = body
+
+    // Update the property
+    const { data: updatedProperty, error: updateError } = await supabase
+      .from('properties')
+      .update({
+        name: propertyFields.name,
+        address: propertyFields.address,
+        city: propertyFields.city,
+        country: propertyFields.country,
+        bedrooms: propertyFields.bedrooms,
+        bathrooms: propertyFields.bathrooms,
+        max_guests: propertyFields.max_guests,
+        is_active: propertyFields.is_active,
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', id)
+      .eq('tenant_id', tenant.id)
+      .select()
+      .single()
+
+    if (updateError) {
+      return NextResponse.json(
+        { error: updateError.message },
+        { status: 500 }
+      )
+    }
+
+    // Update or create property details if provided
+    if (details) {
+      // Check if details exist
+      const { data: existingDetails } = await supabase
+        .from('property_details')
+        .select('id')
+        .eq('property_id', id)
+        .single()
+
+      if (existingDetails) {
+        // Update existing details
+        await supabase
+          .from('property_details')
+          .update({
+            description: details.description,
+            property_type: details.property_type,
+            check_in_time: details.check_in_time,
+            check_out_time: details.check_out_time,
+            min_nights: details.min_nights,
+            max_nights: details.max_nights,
+            house_rules: details.house_rules,
+            cancellation_policy: details.cancellation_policy,
+            instant_book_enabled: details.instant_book_enabled,
+            updated_at: new Date().toISOString(),
+          })
+          .eq('property_id', id)
+      } else {
+        // Create new details
+        await supabase
+          .from('property_details')
+          .insert({
+            property_id: id,
+            description: details.description,
+            property_type: details.property_type,
+            check_in_time: details.check_in_time,
+            check_out_time: details.check_out_time,
+            min_nights: details.min_nights,
+            max_nights: details.max_nights,
+            house_rules: details.house_rules,
+            cancellation_policy: details.cancellation_policy,
+            instant_book_enabled: details.instant_book_enabled,
+          })
+      }
+    }
+
+    return NextResponse.json(updatedProperty)
+  } catch (error) {
+    console.error('Update property error:', error)
+
+    if (error instanceof Error && error.message === 'Not authenticated') {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
+    if (error instanceof Error && error.message === 'No tenant selected') {
+      return NextResponse.json({ error: 'No workspace selected' }, { status: 400 })
+    }
+
+    return NextResponse.json(
+      { error: 'Internal server error' },
+      { status: 500 }
+    )
+  }
+}
